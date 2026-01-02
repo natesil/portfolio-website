@@ -1,0 +1,61 @@
+# Python Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables
+.env
+*.env
+!.env.example
+
+# Database files
+data/
+*.duckdb
+*.duckdb.wal
+*.db
+
+# Data lake raw files (too large for git)
+datalake/raw/**/*.json
+!datalake/raw/**/.gitkeep
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Prefect
+.prefect/
+
+# Claude memory (optional - keep or remove as desired)
+.claude/
+
+# Design files (large static assets)
+*.html
+*.png

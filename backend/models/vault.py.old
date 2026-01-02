@@ -1,0 +1,399 @@
+"""
+Data Vault 2.0 schema for NOAA weather data.
+
+Using SQLAlchemy ORM with DuckDB backend.
+"""
+
+from sqlalchemy import (
+    Column, String, Integer, Float, DateTime, Text, ForeignKey, Boolean, JSON
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
+import hashlib
+
+Base = declarative_base()
+
+
+def generate_hash_key(*values) -> str:
+    """Generate hash key for Data Vault hub/link."""
+    combined = "|".join(str(v) for v in values)
+    return hashlib.md5(combined.encode()).hexdigest()
+
+
+# ============================================================================
+# HUBS - Business Keys
+# ============================================================================
+
+class HubResort(Base):
+    """Hub: Ski Resort business key."""
+    __tablename__ = 'hub_resort'
+
+    resort_key = Column(String(32), primary_key=True)  # MD5 hash
+    resort_name = Column(String(100), nullable=False, unique=True)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='resorts.yaml')
+
+    # Relationships
+    details = relationship("SatResortDetails", back_populates="resort")
+    zones = relationship("LinkResortZone", back_populates="resort")
+    stations = relationship("LinkResortStation", back_populates="resort")
+
+
+class HubZone(Base):
+    """Hub: NWS Forecast Zone business key."""
+    __tablename__ = 'hub_zone'
+
+    zone_key = Column(String(32), primary_key=True)  # MD5 hash
+    zone_id = Column(String(10), nullable=False, unique=True)  # e.g., "MEZ007"
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Relationships
+    details = relationship("SatZoneDetails", back_populates="zone")
+    resorts = relationship("LinkResortZone", back_populates="zone")
+    offices = relationship("LinkZoneOffice", back_populates="zone")
+
+
+class HubStation(Base):
+    """Hub: Observation Station business key."""
+    __tablename__ = 'hub_station'
+
+    station_key = Column(String(32), primary_key=True)  # MD5 hash
+    station_id = Column(String(10), nullable=False, unique=True)  # e.g., "KPWM"
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Relationships
+    details = relationship("SatStationDetails", back_populates="station")
+    resorts = relationship("LinkResortStation", back_populates="station")
+    observations = relationship("SatObservation", back_populates="station")
+
+
+class HubOffice(Base):
+    """Hub: NWS Forecast Office business key."""
+    __tablename__ = 'hub_office'
+
+    office_key = Column(String(32), primary_key=True)  # MD5 hash
+    office_id = Column(String(10), nullable=False, unique=True)  # e.g., "GYX"
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Relationships
+    details = relationship("SatOfficeDetails", back_populates="office")
+    zones = relationship("LinkZoneOffice", back_populates="office")
+
+
+# ============================================================================
+# LINKS - Relationships
+# ============================================================================
+
+class LinkResortZone(Base):
+    """Link: Resort to Zone mapping."""
+    __tablename__ = 'link_resort_zone'
+
+    link_key = Column(String(32), primary_key=True)  # MD5 hash
+    resort_key = Column(String(32), ForeignKey('hub_resort.resort_key'), nullable=False)
+    zone_key = Column(String(32), ForeignKey('hub_zone.zone_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Relationships
+    resort = relationship("HubResort", back_populates="zones")
+    zone = relationship("HubZone", back_populates="resorts")
+
+
+class LinkResortStation(Base):
+    """Link: Resort to nearest Station(s)."""
+    __tablename__ = 'link_resort_station'
+
+    link_key = Column(String(32), primary_key=True)  # MD5 hash
+    resort_key = Column(String(32), ForeignKey('hub_resort.resort_key'), nullable=False)
+    station_key = Column(String(32), ForeignKey('hub_station.station_key'), nullable=False)
+    station_rank = Column(Integer, nullable=False)  # 1=nearest, 2=second nearest, etc.
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Relationships
+    resort = relationship("HubResort", back_populates="stations")
+    station = relationship("HubStation", back_populates="resorts")
+
+
+class LinkZoneOffice(Base):
+    """Link: Zone to managing Office."""
+    __tablename__ = 'link_zone_office'
+
+    link_key = Column(String(32), primary_key=True)  # MD5 hash
+    zone_key = Column(String(32), ForeignKey('hub_zone.zone_key'), nullable=False)
+    office_key = Column(String(32), ForeignKey('hub_office.office_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Relationships
+    zone = relationship("HubZone", back_populates="offices")
+    office = relationship("HubOffice", back_populates="zones")
+
+
+# ============================================================================
+# SATELLITES - Descriptive Data
+# ============================================================================
+
+class SatResortDetails(Base):
+    """Satellite: Resort descriptive data."""
+    __tablename__ = 'sat_resort_details'
+    __table_args__ = {'sqlite_autoincrement': False}
+
+    id = Column(Integer, primary_key=True)
+    resort_key = Column(String(32), ForeignKey('hub_resort.resort_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    load_end_date = Column(DateTime)  # For Type 2 SCD
+    record_source = Column(String(50), nullable=False, default='resorts.yaml')
+
+    # Attributes
+    state = Column(String(2), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    full_name = Column(String(200))
+    region = Column(String(100))
+    grid_id = Column(String(10))
+    grid_x = Column(Integer)
+    grid_y = Column(Integer)
+
+    # Relationships
+    resort = relationship("HubResort", back_populates="details")
+
+
+class SatZoneDetails(Base):
+    """Satellite: Zone descriptive data."""
+    __tablename__ = 'sat_zone_details'
+    __table_args__ = {'sqlite_autoincrement': False}
+
+    id = Column(Integer, primary_key=True)
+    zone_key = Column(String(32), ForeignKey('hub_zone.zone_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    load_end_date = Column(DateTime)
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Attributes
+    name = Column(String(200))
+    state = Column(String(2))
+    effective_date = Column(DateTime)
+    expiration_date = Column(DateTime)
+    time_zone = Column(String(50))
+
+    # Relationships
+    zone = relationship("HubZone", back_populates="details")
+
+
+class SatStationDetails(Base):
+    """Satellite: Station descriptive data."""
+    __tablename__ = 'sat_station_details'
+
+    id = Column(Integer, primary_key=True, autoincrement=False)
+    station_key = Column(String(32), ForeignKey('hub_station.station_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    load_end_date = Column(DateTime)
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Attributes
+    name = Column(String(200))
+    latitude = Column(Float)
+    longitude = Column(Float)
+    elevation_value = Column(Float)
+    elevation_unit = Column(String(50))
+    time_zone = Column(String(50))
+
+    # Relationships
+    station = relationship("HubStation", back_populates="details")
+
+
+class SatOfficeDetails(Base):
+    """Satellite: Office descriptive data."""
+    __tablename__ = 'sat_office_details'
+
+    id = Column(Integer, primary_key=True, autoincrement=False)
+    office_key = Column(String(32), ForeignKey('hub_office.office_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    load_end_date = Column(DateTime)
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Attributes
+    name = Column(String(200))
+    url = Column(String(500))
+
+    # Relationships
+    office = relationship("HubOffice", back_populates="details")
+
+
+# ============================================================================
+# SATELLITES - Time-Series Forecast Data
+# ============================================================================
+
+class SatForecastPeriod(Base):
+    """Satellite: 12-hour forecast periods."""
+    __tablename__ = 'sat_forecast_period'
+
+    id = Column(Integer, primary_key=True, autoincrement=False)
+    resort_key = Column(String(32), ForeignKey('hub_resort.resort_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Forecast metadata
+    forecast_generated_at = Column(DateTime, nullable=False)
+    forecast_updated_at = Column(DateTime, nullable=False)
+
+    # Period identification
+    period_number = Column(Integer, nullable=False)
+    period_name = Column(String(50), nullable=False)  # e.g., "Tonight", "Monday"
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    is_daytime = Column(Boolean, nullable=False)
+
+    # Forecast values
+    temperature = Column(Integer)
+    temperature_unit = Column(String(1))  # F or C
+    temperature_trend = Column(String(20))
+    wind_speed = Column(String(50))
+    wind_direction = Column(String(10))
+    icon_url = Column(String(500))
+    short_forecast = Column(Text)
+    detailed_forecast = Column(Text)
+
+    # Probabilities and measurements
+    probability_of_precipitation = Column(Integer)  # Percentage
+    dewpoint_value = Column(Float)
+    dewpoint_unit = Column(String(50))
+    relative_humidity = Column(Integer)
+
+
+class SatForecastHourly(Base):
+    """Satellite: Hourly forecast periods."""
+    __tablename__ = 'sat_forecast_hourly'
+
+    id = Column(Integer, primary_key=True, autoincrement=False)
+    resort_key = Column(String(32), ForeignKey('hub_resort.resort_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Forecast metadata
+    forecast_generated_at = Column(DateTime, nullable=False)
+    forecast_updated_at = Column(DateTime, nullable=False)
+
+    # Period identification
+    period_number = Column(Integer, nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    is_daytime = Column(Boolean, nullable=False)
+
+    # Forecast values
+    temperature = Column(Integer)
+    temperature_unit = Column(String(1))
+    wind_speed = Column(String(50))
+    wind_direction = Column(String(10))
+    icon_url = Column(String(500))
+    short_forecast = Column(Text)
+
+    # Probabilities and measurements
+    probability_of_precipitation = Column(Integer)
+    dewpoint_value = Column(Float)
+    dewpoint_unit = Column(String(50))
+    relative_humidity = Column(Integer)
+
+
+class SatGridData(Base):
+    """Satellite: Raw grid forecast data (optional, high-detail)."""
+    __tablename__ = 'sat_grid_data'
+
+    id = Column(Integer, primary_key=True, autoincrement=False)
+    resort_key = Column(String(32), ForeignKey('hub_resort.resort_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Forecast metadata
+    forecast_updated_at = Column(DateTime, nullable=False)
+    valid_time_start = Column(DateTime, nullable=False)
+    valid_time_end = Column(DateTime, nullable=False)
+
+    # Weather data layers (JSON for flexibility)
+    temperature_data = Column(JSON)
+    dewpoint_data = Column(JSON)
+    wind_speed_data = Column(JSON)
+    wind_direction_data = Column(JSON)
+    precipitation_data = Column(JSON)
+    snowfall_data = Column(JSON)  # Important for ski resorts!
+    sky_cover_data = Column(JSON)
+
+
+class SatObservation(Base):
+    """Satellite: Current conditions from observation stations."""
+    __tablename__ = 'sat_observation'
+
+    id = Column(Integer, primary_key=True, autoincrement=False)
+    station_key = Column(String(32), ForeignKey('hub_station.station_key'), nullable=False)
+    load_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    record_source = Column(String(50), nullable=False, default='weather.gov')
+
+    # Observation metadata
+    observation_time = Column(DateTime, nullable=False)
+    text_description = Column(String(200))
+    icon_url = Column(String(500))
+    raw_message = Column(Text)  # METAR
+
+    # Measurements
+    temperature = Column(Float)
+    temperature_unit = Column(String(50))
+    dewpoint = Column(Float)
+    dewpoint_unit = Column(String(50))
+    wind_direction = Column(Float)  # Degrees
+    wind_speed = Column(Float)
+    wind_speed_unit = Column(String(50))
+    wind_gust = Column(Float)
+    wind_gust_unit = Column(String(50))
+    barometric_pressure = Column(Float)
+    barometric_pressure_unit = Column(String(50))
+    visibility = Column(Float)
+    visibility_unit = Column(String(50))
+    relative_humidity = Column(Float)
+    wind_chill = Column(Float)
+    wind_chill_unit = Column(String(50))
+    heat_index = Column(Float)
+    heat_index_unit = Column(String(50))
+
+    # Precipitation
+    precipitation_last_hour = Column(Float)
+    precipitation_last_3hours = Column(Float)
+    precipitation_last_6hours = Column(Float)
+    precipitation_unit = Column(String(50))
+
+    # Relationships
+    station = relationship("HubStation", back_populates="observations")
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+def create_all_tables(engine):
+    """Create all tables in the database."""
+    Base.metadata.create_all(engine)
+
+
+def drop_all_tables(engine):
+    """Drop all tables from the database."""
+    Base.metadata.drop_all(engine)
+
+
+if __name__ == "__main__":
+    from sqlalchemy import create_engine
+
+    # Create DuckDB in-memory database for testing
+    engine = create_engine('duckdb:///:memory:')
+
+    print("Creating Data Vault schema...")
+    create_all_tables(engine)
+
+    print("\nTables created:")
+    for table in Base.metadata.sorted_tables:
+        print(f"  - {table.name}")
+
+    print("\n✓ Schema created successfully!")

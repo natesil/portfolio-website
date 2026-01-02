@@ -1,0 +1,30 @@
+# Ski Resort Configuration
+# New England ski resorts for weather data collection
+
+resorts:
+  - name: Sugarloaf
+    state: ME
+    location:
+      latitude: 45.0317
+      longitude: -70.3139
+    metadata:
+      full_name: Sugarloaf Mountain Resort
+      region: Western Maine Mountains
+
+  - name: Stratton
+    state: VT
+    location:
+      latitude: 43.1139
+      longitude: -72.9083
+    metadata:
+      full_name: Stratton Mountain Resort
+      region: Southern Vermont
+
+  - name: Wildcat
+    state: NH
+    location:
+      latitude: 44.2631
+      longitude: -71.2317
+    metadata:
+      full_name: Wildcat Mountain
+      region: White Mountains
