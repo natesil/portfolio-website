@@ -1,0 +1,306 @@
+version: 2
+
+models:
+  # Bronze Layer
+  - name: bronze_points
+    description: "Flattened points data with grid coordinates and zone information"
+    columns:
+      - name: identifier
+        description: "Resort identifier"
+        tests:
+          - not_null
+      - name: grid_id
+        description: "Forecast office grid ID"
+      - name: forecast_zone
+        description: "Forecast zone URL"
+
+  - name: bronze_forecast_periods
+    description: "12-hour forecast periods with temperature, wind, and precipitation"
+    columns:
+      - name: identifier
+        description: "Resort identifier"
+        tests:
+          - not_null
+      - name: period_number
+        description: "Sequential period number"
+        tests:
+          - not_null
+
+  - name: bronze_hourly_periods
+    description: "Hourly forecast periods"
+    columns:
+      - name: identifier
+        description: "Resort identifier"
+        tests:
+          - not_null
+      - name: start_time
+        description: "Period start time"
+        tests:
+          - not_null
+
+  - name: bronze_observations
+    description: "Weather station observations"
+    columns:
+      - name: station_id
+        description: "Station identifier"
+        tests:
+          - not_null
+      - name: observation_time
+        description: "Time of observation"
+        tests:
+          - not_null
+
+  - name: bronze_stations
+    description: "Weather station metadata"
+
+  - name: bronze_zones
+    description: "Forecast zone metadata"
+
+  - name: bronze_grid_data
+    description: "Raw numerical forecast grid data"
+
+  # Silver Layer - Hubs
+  - name: hub_resort
+    description: "Resort business keys"
+    columns:
+      - name: resort_key
+        description: "MD5 hash of resort name"
+        tests:
+          - not_null
+          - unique
+      - name: resort_name
+        description: "Resort name (business key)"
+        tests:
+          - not_null
+          - unique
+
+  - name: hub_zone
+    description: "Forecast zone business keys"
+    columns:
+      - name: zone_key
+        description: "MD5 hash of zone ID"
+        tests:
+          - not_null
+          - unique
+      - name: zone_id
+        description: "Zone ID (business key)"
+        tests:
+          - not_null
+          - unique
+
+  - name: hub_station
+    description: "Weather station business keys"
+    columns:
+      - name: station_key
+        description: "MD5 hash of station ID"
+        tests:
+          - not_null
+          - unique
+      - name: station_id
+        description: "Station ID (business key)"
+        tests:
+          - not_null
+          - unique
+
+  - name: hub_office
+    description: "Forecast office business keys"
+    columns:
+      - name: office_key
+        description: "MD5 hash of office ID"
+        tests:
+          - not_null
+          - unique
+      - name: office_id
+        description: "Office ID (business key)"
+        tests:
+          - not_null
+          - unique
+
+  # Silver Layer - Links
+  - name: link_resort_zone
+    description: "Resort to forecast zone relationships"
+    columns:
+      - name: link_key
+        description: "MD5 hash of relationship"
+        tests:
+          - not_null
+          - unique
+      - name: resort_key
+        description: "Foreign key to hub_resort"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_resort')
+              field: resort_key
+      - name: zone_key
+        description: "Foreign key to hub_zone"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_zone')
+              field: zone_key
+
+  - name: link_resort_station
+    description: "Resort to weather station relationships with ranking"
+    columns:
+      - name: link_key
+        description: "MD5 hash of relationship"
+        tests:
+          - not_null
+          - unique
+      - name: resort_key
+        description: "Foreign key to hub_resort"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_resort')
+              field: resort_key
+      - name: station_key
+        description: "Foreign key to hub_station"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_station')
+              field: station_key
+      - name: station_rank
+        description: "Station ranking by distance/relevance"
+
+  - name: link_zone_office
+    description: "Zone to forecast office relationships"
+    columns:
+      - name: link_key
+        description: "MD5 hash of relationship"
+        tests:
+          - not_null
+          - unique
+      - name: zone_key
+        description: "Foreign key to hub_zone"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_zone')
+              field: zone_key
+      - name: office_key
+        description: "Foreign key to hub_office"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_office')
+              field: office_key
+
+  # Silver Layer - Satellites
+  - name: sat_resort_details
+    description: "Resort descriptive attributes"
+    columns:
+      - name: resort_key
+        description: "Foreign key to hub_resort"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_resort')
+              field: resort_key
+
+  - name: sat_zone_details
+    description: "Zone descriptive attributes"
+    columns:
+      - name: zone_key
+        description: "Foreign key to hub_zone"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_zone')
+              field: zone_key
+
+  - name: sat_station_details
+    description: "Station descriptive attributes"
+    columns:
+      - name: station_key
+        description: "Foreign key to hub_station"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_station')
+              field: station_key
+
+  - name: sat_office_details
+    description: "Office descriptive attributes"
+    columns:
+      - name: office_key
+        description: "Foreign key to hub_office"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_office')
+              field: office_key
+
+  - name: sat_forecast_period
+    description: "12-hour forecast period facts"
+    columns:
+      - name: resort_key
+        description: "Foreign key to hub_resort"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_resort')
+              field: resort_key
+
+  - name: sat_forecast_hourly
+    description: "Hourly forecast facts"
+    columns:
+      - name: resort_key
+        description: "Foreign key to hub_resort"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_resort')
+              field: resort_key
+
+  - name: sat_observation
+    description: "Station observation facts"
+    columns:
+      - name: station_key
+        description: "Foreign key to hub_station"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_station')
+              field: station_key
+
+  - name: sat_grid_data
+    description: "Numerical forecast grid data"
+    columns:
+      - name: resort_key
+        description: "Foreign key to hub_resort"
+        tests:
+          - not_null
+          - relationships:
+              config:
+                severity: warn
+              to: ref('hub_resort')
+              field: resort_key

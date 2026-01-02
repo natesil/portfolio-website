@@ -1,0 +1,46 @@
+
+  
+    
+    
+
+    create  table
+      "weather"."main_bronze"."bronze_hourly_periods__dbt_tmp"
+  
+    as (
+      
+
+SELECT
+    metadata.saved_at::TIMESTAMP as saved_at,
+    metadata.category as load_category,
+    metadata.identifier,
+    metadata.timestamp::TIMESTAMP as load_timestamp,
+    data.properties.generatedAt::TIMESTAMP as forecast_generated_at,
+    data.properties.updateTime::TIMESTAMP as forecast_updated_at,
+    data.properties.units as forecast_units,
+    data.properties.forecastGenerator as forecast_generator,
+    data.properties.elevation.value as elevation_value,
+    data.properties.elevation.unitCode as elevation_unit,
+    period.number as period_number,
+    period.name as period_name,
+    period.startTime::TIMESTAMP as start_time,
+    period.endTime::TIMESTAMP as end_time,
+    period.isDaytime as is_daytime,
+    period.temperature,
+    period.temperatureUnit as temperature_unit,
+    period.temperatureTrend as temperature_trend,
+    period.windSpeed as wind_speed,
+    period.windDirection as wind_direction,
+    period.icon as icon_url,
+    period.shortForecast as short_forecast,
+    period.detailedForecast as detailed_forecast,
+    period.probabilityOfPrecipitation.value as probability_of_precipitation_value,
+    period.probabilityOfPrecipitation.unitCode as probability_of_precipitation_unit,
+    period.dewpoint.value as dewpoint_value,
+    period.dewpoint.unitCode as dewpoint_unit,
+    period.relativeHumidity.value as relative_humidity_value,
+    period.relativeHumidity.unitCode as relative_humidity_unit
+FROM read_json('../../datalake/raw/hourly/*.json', auto_detect=true, union_by_name=true),
+UNNEST(data.properties.periods) AS t(period)
+    );
+  
+  

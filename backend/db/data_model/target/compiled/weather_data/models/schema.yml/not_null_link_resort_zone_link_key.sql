@@ -1,0 +1,11 @@
+
+    
+    
+
+
+
+select link_key
+from "weather"."main_silver"."link_resort_zone"
+where link_key is null
+
+

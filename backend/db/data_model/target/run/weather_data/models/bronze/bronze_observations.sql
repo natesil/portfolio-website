@@ -1,0 +1,65 @@
+
+  
+    
+    
+
+    create  table
+      "weather"."main_bronze"."bronze_observations__dbt_tmp"
+  
+    as (
+      
+
+SELECT
+    metadata.saved_at::TIMESTAMP as saved_at,
+    metadata.category as load_category,
+    metadata.identifier,
+    metadata.timestamp::TIMESTAMP as load_timestamp,
+    data.properties.id as observation_id,
+    data.properties.type as observation_type,
+    data.properties.station as station_url,
+    REGEXP_EXTRACT(data.properties.station, '[^/]+$') as station_id,
+    data.properties.timestamp::TIMESTAMP as observation_time,
+    data.properties.rawMessage as raw_message,
+    data.properties.textDescription as text_description,
+    data.properties.icon as icon_url,
+    data.geometry.type as geometry_type,
+    data.geometry.coordinates[1] as longitude,
+    data.geometry.coordinates[2] as latitude,
+    data.properties.elevation.value as elevation_value,
+    data.properties.elevation.unitCode as elevation_unit,
+    data.properties.temperature.value as temperature_value,
+    data.properties.temperature.unitCode as temperature_unit,
+    data.properties.dewpoint.value as dewpoint_value,
+    data.properties.dewpoint.unitCode as dewpoint_unit,
+    data.properties.heatIndex.value as heat_index_value,
+    data.properties.heatIndex.unitCode as heat_index_unit,
+    data.properties.windChill.value as wind_chill_value,
+    data.properties.windChill.unitCode as wind_chill_unit,
+    data.properties.maxTemperatureLast24Hours.value as max_temperature_last_24h_value,
+    data.properties.maxTemperatureLast24Hours.unitCode as max_temperature_last_24h_unit,
+    data.properties.minTemperatureLast24Hours.value as min_temperature_last_24h_value,
+    data.properties.minTemperatureLast24Hours.unitCode as min_temperature_last_24h_unit,
+    data.properties.windDirection.value as wind_direction_value,
+    data.properties.windDirection.unitCode as wind_direction_unit,
+    data.properties.windSpeed.value as wind_speed_value,
+    data.properties.windSpeed.unitCode as wind_speed_unit,
+    data.properties.windGust.value as wind_gust_value,
+    data.properties.windGust.unitCode as wind_gust_unit,
+    data.properties.barometricPressure.value as barometric_pressure_value,
+    data.properties.barometricPressure.unitCode as barometric_pressure_unit,
+    data.properties.seaLevelPressure.value as sea_level_pressure_value,
+    data.properties.seaLevelPressure.unitCode as sea_level_pressure_unit,
+    data.properties.precipitationLastHour.value as precipitation_last_hour_value,
+    data.properties.precipitationLastHour.unitCode as precipitation_last_hour_unit,
+    data.properties.precipitationLast3Hours.value as precipitation_last_3hours_value,
+    data.properties.precipitationLast3Hours.unitCode as precipitation_last_3hours_unit,
+    data.properties.precipitationLast6Hours.value as precipitation_last_6hours_value,
+    data.properties.precipitationLast6Hours.unitCode as precipitation_last_6hours_unit,
+    data.properties.visibility.value as visibility_value,
+    data.properties.visibility.unitCode as visibility_unit,
+    data.properties.relativeHumidity.value as relative_humidity_value,
+    data.properties.relativeHumidity.unitCode as relative_humidity_unit
+FROM read_json('../../datalake/raw/observations/*.json', auto_detect=true, union_by_name=true)
+    );
+  
+  

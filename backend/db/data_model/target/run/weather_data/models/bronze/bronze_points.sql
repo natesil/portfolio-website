@@ -1,0 +1,42 @@
+
+  
+    
+    
+
+    create  table
+      "weather"."main_bronze"."bronze_points__dbt_tmp"
+  
+    as (
+      
+
+SELECT
+    metadata.saved_at::TIMESTAMP as saved_at,
+    metadata.category as load_category,
+    metadata.identifier,
+    metadata.timestamp::TIMESTAMP as load_timestamp,
+    data.properties.id as point_id,
+    data.properties.type as point_type,
+    data.properties.cwa,
+    data.properties.forecastOffice as forecast_office,
+    data.properties.gridId as grid_id,
+    data.properties.gridX as grid_x,
+    data.properties.gridY as grid_y,
+    data.properties.forecast as forecast_url,
+    data.properties.forecastHourly as forecast_hourly_url,
+    data.properties.forecastGridData as forecast_grid_data_url,
+    data.properties.observationStations as observation_stations_url,
+    data.properties.forecastZone as forecast_zone,
+    data.properties.county as county_url,
+    data.properties.fireWeatherZone as fire_weather_zone,
+    data.properties.timeZone as time_zone,
+    data.properties.radarStation as radar_station,
+    data.properties.city,
+    data.properties.state,
+    data.geometry.type as geometry_type,
+    data.geometry.coordinates[1] as longitude,
+    data.geometry.coordinates[2] as latitude,
+    data.geometry.coordinates[3] as elevation
+FROM read_json('../../datalake/raw/points/*.json', auto_detect=true, union_by_name=true)
+    );
+  
+  

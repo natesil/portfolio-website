@@ -17,28 +17,49 @@ st.set_page_config(
 
 st.title("🌤️ Weather Data Vault Console")
 
-# Get all tables
+# Get all tables across all schemas
 try:
-    all_tables = get_tables()
+    with get_session() as con:
+        result = con.execute("""
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_schema IN ('main', 'bronze', 'silver', 'gold')
+            ORDER BY table_schema, table_name
+        """).fetchall()
+
+        # Create fully qualified table names
+        all_tables = []
+        table_map = {}
+        for schema, table in result:
+            if schema == 'main':
+                full_name = table
+            else:
+                full_name = f"{schema}.{table}"
+            all_tables.append(full_name)
+            table_map[full_name] = (schema, table)
+
 except Exception as e:
     st.error(f"Error connecting to database: {e}")
-    st.info("Make sure to run `python -m db.session` first to initialize the database.")
+    st.info("Make sure to run `dbt run` first to create the tables.")
     st.stop()
 
-# Organize tables by type
-hubs = [t for t in all_tables if t.startswith('hub_')]
-links = [t for t in all_tables if t.startswith('link_')]
-sats = [t for t in all_tables if t.startswith('sat_')]
+# Organize tables by type (check base table name, not schema)
+bronze = [t for t in all_tables if 'bronze_' in t]
+hubs = [t for t in all_tables if 'hub_' in t]
+links = [t for t in all_tables if 'link_' in t]
+sats = [t for t in all_tables if 'sat_' in t]
 
 # Display stats
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     st.metric("Total Tables", len(all_tables))
 with col2:
-    st.metric("Hubs", len(hubs))
+    st.metric("Bronze", len(bronze))
 with col3:
-    st.metric("Links", len(links))
+    st.metric("Hubs", len(hubs))
 with col4:
+    st.metric("Links", len(links))
+with col5:
     st.metric("Satellites", len(sats))
 
 st.divider()
@@ -75,6 +96,16 @@ def display_table(table_name: str):
 if st.button("🔄 Refresh Data", type="primary"):
     st.rerun()
 
+# Display Bronze Layer
+if bronze:
+    st.header("🥉 Bronze Layer (Flattened Raw Data)")
+    st.caption("Flattened tables loaded from JSON files in datalake/raw/")
+
+    for table in sorted(bronze):
+        display_table(table)
+else:
+    st.warning("No bronze tables found. Run `dbt run --select bronze.*` to create bronze tables.")
+
 # Display Hubs
 if hubs:
     st.header("🎯 Hubs (Business Keys)")
@@ -83,7 +114,7 @@ if hubs:
     for table in sorted(hubs):
         display_table(table)
 else:
-    st.warning("No hub tables found.")
+    st.warning("No hub tables found. Run `dbt run --select silver.hubs.*` to create hubs.")
 
 # Display Links
 if links:
@@ -93,7 +124,7 @@ if links:
     for table in sorted(links):
         display_table(table)
 else:
-    st.info("No link tables found.")
+    st.info("No link tables found. Run `dbt run --select silver.links.*` to create links.")
 
 # Display Satellites
 if sats:
@@ -103,15 +134,19 @@ if sats:
     for table in sorted(sats):
         display_table(table)
 else:
-    st.info("No satellite tables found.")
+    st.info("No satellite tables found. Run `dbt run --select silver.satellites.*` to create satellites.")
 
 # Sidebar with info
 with st.sidebar:
     st.header("About")
     st.markdown("""
-    This console displays the Data Vault 2.0 schema for weather data.
+    This console displays the Bronze and Silver layers for weather data.
 
-    **Data Vault Components:**
+    **Bronze Layer (Flattened Raw):**
+    - Raw data loaded from JSON files
+    - Flattened structures for easy querying
+
+    **Silver Layer (Data Vault 2.0):**
     - **Hubs**: Core business entities (Resorts, Zones, Stations, Offices)
     - **Links**: Relationships between hubs
     - **Satellites**: Descriptive data and time-series facts
@@ -123,19 +158,25 @@ with st.sidebar:
 
     st.header("Quick Actions")
 
-    if st.button("📋 Show Schema"):
+    if st.button("📋 dbt Commands"):
         st.code("""
-# View schema
-python -m db.session
+# Run all models
+cd db/data_model && dbt run
 
-# Drop all tables
-from db import drop_all_tables
-drop_all_tables()
+# Run specific layer
+dbt run --select bronze.*
+dbt run --select silver.*
 
-# Reinitialize
-from db import init_db
-init_db()
-        """, language="python")
+# Full refresh (rebuild)
+dbt run --full-refresh
+
+# Run tests
+dbt test
+
+# Generate docs
+dbt docs generate
+dbt docs serve
+        """, language="bash")
 
     st.divider()
 

@@ -1,0 +1,11 @@
+weather_data:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '../../data/weather.duckdb'
+      schema: main
+      threads: 4
+      extensions:
+        - httpfs
+        - parquet

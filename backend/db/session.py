@@ -165,15 +165,15 @@ if __name__ == "__main__":
     print(f"Database path: {DB_PATH}")
     print("\nInitializing database...")
     init_db()
+    drop_all_tables()
+    # print("\nGetting tables...")
+    # tables = get_tables()
+    # print(f"✓ Found {len(tables)} tables:")
+    # for table in tables:
+    #     print(f"  - {table}")
 
-    print("\nGetting tables...")
-    tables = get_tables()
-    print(f"✓ Found {len(tables)} tables:")
-    for table in tables:
-        print(f"  - {table}")
+    # print("\nTesting query...")
+    # result = execute_query("SELECT 'Hello from DuckDB!' as message")
+    # print(f"✓ Query result: {result[0][0]}")
 
-    print("\nTesting query...")
-    result = execute_query("SELECT 'Hello from DuckDB!' as message")
-    print(f"✓ Query result: {result[0][0]}")
-
-    print("\n✓ Database tests passed!")
+    # print("\n✓ Database tests passed!")

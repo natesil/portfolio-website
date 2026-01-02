@@ -1,0 +1,55 @@
+name: 'weather_data'
+version: '1.0.0'
+
+# Project config
+profile: 'weather_data'
+config-version: 2
+
+# Directories
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+  - "logs"
+
+# Model configurations
+models:
+  weather_data:
+    # Bronze layer: Flatten raw JSON from datalake
+    bronze:
+      +materialized: table
+      +schema: bronze
+
+    # Silver layer: Data Vault 2.0
+    silver:
+      +materialized: incremental
+      +schema: silver
+      +on_schema_change: "append_new_columns"
+
+      hubs:
+        +materialized: incremental
+        +unique_key: ['hub_key']
+
+      links:
+        +materialized: incremental
+        +unique_key: ['link_key']
+
+      satellites:
+        +materialized: incremental
+        +unique_key: ['hub_key', 'load_date']
+
+    # Gold layer: Analytics views
+    gold:
+      +materialized: view
+      +schema: gold
+
+# Variables
+vars:
+  raw_data_path: "../datalake/raw"
+  db_path: "../data/weather.duckdb"
